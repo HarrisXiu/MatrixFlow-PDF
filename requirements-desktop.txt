@@ -1,0 +1,6 @@
+pywebview==6.2.1
+pywin32
+pypdf
+Pillow
+reportlab
+pyinstaller==6.22.2
