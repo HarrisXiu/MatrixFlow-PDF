@@ -10,7 +10,7 @@ MatrixFlow PDF combines a React interface with a Python conversion service. Its 
 
 ## Queue ordering and blank pages
 
-Drag a file's colored tag onto the upper or lower half of another row to insert it before or after that file. A green line marks the destination. Click **Name** or **Type** in the table header to toggle ascending/descending order. Name sorting ignores case and uses natural numbers (file2 before file10); type sorting groups extensions and then names. These operations change the actual conversion/merge order, including when the list is filtered, and are disabled during conversion.
+Drag anywhere on a file row onto the upper or lower half of another row to insert it before or after that file. A green line marks the destination. Click **Name** or **Type** in the table header to toggle ascending/descending order. Name sorting ignores case and uses natural numbers (file2 before file10); type sorting groups extensions and then names. These operations change the actual conversion/merge order, including when the list is filtered, and are disabled during conversion.
 
 In **Advanced → Blank pages**, choose **Keep blank pages** (default) or **Detect and remove**. Removal runs after page-range selection and before splitting, merging, watermarks and page numbering. It renders candidate pages with PDFium and removes entirely white or near-white pages, including clean white scans. Pages containing text, annotations/forms, visible marks, uncertain render results or obvious scan noise are kept. This conservative detector may retain noisy or off-white scans. Removal counts appear in Activity. All-blank inputs are skipped without producing empty PDFs; source files are never changed.
 

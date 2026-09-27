@@ -23,7 +23,9 @@
 .wordmark .brand-format{color:inherit;font-size:.7em;letter-spacing:.06em}
 @media(max-width:600px){.wordmark{font-size:14px;white-space:nowrap}.wordmark .edition{display:none}}
 
-/* Queue tags act as drag handles; row edges show the insertion position. */
+/* The entire queue row is draggable; row edges show the insertion position. */
+.file-table tbody tr[draggable="true"]{cursor:grab;user-select:none;-webkit-user-select:none}
+.file-table tbody tr[draggable="true"]:active{cursor:grabbing}
 .file-tag{border:1px solid transparent;padding:0;cursor:grab;user-select:none;touch-action:none}
 .file-tag:hover:not(:disabled){border-color:var(--green);filter:brightness(1.2)}
 .file-tag:active:not(:disabled){cursor:grabbing}

@@ -57,21 +57,23 @@ def main():
                 window.evaluate_js("document.querySelector('[aria-label=\"按名称排序\"]').click()")
                 wait_order(['file1.pdf', 'file2.pdf', 'file10.pdf'])
                 window.evaluate_js('''(() => {
-                    const tag = document.querySelector('.file-tag');
+                    const source = document.querySelector('.file-table tbody tr');
+                    if (!source.draggable) throw new Error('Queue row is not draggable');
+                    const filename = source.querySelector('.filename strong');
                     const row = document.querySelectorAll('.file-table tbody tr')[2];
                     const transfer = new DataTransfer();
                     const options = {bubbles:true, cancelable:true, dataTransfer:transfer};
-                    tag.dispatchEvent(new DragEvent('dragstart', options));
+                    filename.dispatchEvent(new DragEvent('dragstart', options));
                     const rect = row.getBoundingClientRect();
                     options.clientY = rect.bottom - 2;
                     row.dispatchEvent(new DragEvent('dragover', options));
                     row.dispatchEvent(new DragEvent('drop', options));
-                    tag.dispatchEvent(new DragEvent('dragend', options));
+                    source.dispatchEvent(new DragEvent('dragend', options));
                 })()''')
                 wait_order(['file2.pdf', 'file10.pdf', 'file1.pdf'])
                 assert service.queue_sort is None
                 assert not window.evaluate_js("document.querySelector('.drop-overlay,.toast') !== null")
-                print('PASS: real WebView2 column sorting and tag drag update the Python conversion queue', flush=True)
+                print('PASS: real WebView2 column sorting and full-row drag update the Python conversion queue', flush=True)
             except Exception as exc:
                 failures.append(exc)
             finally:

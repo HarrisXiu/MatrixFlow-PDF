@@ -55,7 +55,7 @@ describe('React desktop workspace',()=>{
   expect(byName.closest('th').getAttribute('aria-sort')).toBe('none');
   expect(screen.getByRole('checkbox',{name:'first.pdf'}).checked).toBe(true);
  });
- it('drags a file tag after another row without showing the external-file overlay',async()=>{
+ it.each(['.file-tag','.filename strong','.filename small','.file-type','.status','td:last-child','tr'])('drags from %s without showing the external-file overlay',async selector=>{
   state.files=queueFixture();
   const {container}=render(<App/>);
   const tag=await screen.findByRole('button',{name:'拖动排序 first.pdf'});
@@ -63,7 +63,9 @@ describe('React desktop workspace',()=>{
   const row=screen.getByText('third.pdf',{selector:'strong'}).closest('tr');
   vi.spyOn(row,'getBoundingClientRect').mockReturnValue({top:100,height:60,bottom:160});
   const transfer={types:['application/x-matrixflow-queue'],setData:vi.fn()};
-  dragEvent(tag,'dragstart',transfer);
+  const sourceRow=tag.closest('tr');
+  expect(sourceRow.draggable).toBe(true);
+  dragEvent(selector==='tr'?sourceRow:sourceRow.querySelector(selector),'dragstart',transfer);
   dragEvent(row,'dragover',transfer,150);
   expect(row.classList.contains('insert-after')).toBe(true);
   expect(container.querySelector('.drop-overlay')).toBeNull();
@@ -107,7 +109,7 @@ describe('React desktop workspace',()=>{
   render(<App/>);
   const tag=await screen.findByRole('button',{name:'拖动排序 first.pdf'});
   expect(tag.disabled).toBe(true);
-  expect(tag.draggable).toBe(false);
+  expect(tag.closest('tr').draggable).toBe(false);
   expect(screen.getByRole('button',{name:'按名称排序'}).disabled).toBe(true);
   expect(screen.getByRole('button',{name:'按类型排序'}).disabled).toBe(true);
   dragEvent(tag,'dragstart',{types:[],setData:vi.fn()});
