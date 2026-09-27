@@ -23,7 +23,9 @@ def main():
         window.dom.document.events.dragover += DOMEventHandler(lambda event:None,True,False,debounce=300)
         def drop(event):
             try:
-                service.add([f.get('pywebviewFullPath') for f in event.get('dataTransfer',{}).get('files',[])])
+                paths = [f.get('pywebviewFullPath') for f in event.get('dataTransfer',{}).get('files',[])]
+                if any(paths):
+                    service.add(paths)
             except Exception as exc: service.queue_log(str(exc),True)
         window.dom.document.events.drop += DOMEventHandler(drop,True,False)
     window.events.loaded += bind

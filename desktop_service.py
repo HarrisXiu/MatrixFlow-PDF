@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import threading
 import time
@@ -20,6 +21,7 @@ class ConversionService(ConversionCore):
         self.processing = False
         self.cancel_flag = threading.Event()
         self.files = []
+        self.queue_sort = None
         self.font_map = {}
         self.logs = deque(maxlen=400)
         self.actual_engine = ''
@@ -50,6 +52,8 @@ class ConversionService(ConversionCore):
         cfg = AppConfig(**data)
         if cfg.engine not in ('auto','office','wps'):
             raise ValueError('无效的转换引擎')
+        if cfg.blank_page_action not in ('keep', 'remove'):
+            raise ValueError('空白页处理必须为保留或移除')
         if cfg.lang not in ('','zh_cn','zh_tw','en','ja'):
             raise ValueError('无效的语言')
         cfg.wm_size = int(cfg.wm_size)
@@ -72,7 +76,7 @@ class ConversionService(ConversionCore):
                 unit = {'orig': item, 'sheet': item['sheets'][0] if item['sheets'] else '', 'fseq':i}
                 row['output'] = self.apply_tags(self.config.naming_tpl, unit, i, i, 1) + '.pdf'
                 rows.append(row)
-            return {'files': rows, 'busy': self.processing, 'progress': self.progress,
+            return {'files': rows, 'queue_sort': self.queue_sort, 'busy': self.processing, 'progress': self.progress,
                     'maximum': self.maximum, 'label': self.label, 'logs': list(self.logs),
                     'last_output':self.last_output, 'actual_engine':self.actual_engine,
                     'config':asdict(self.config), 'presets':list(self.presets), 'fonts':self.fonts,
@@ -107,6 +111,7 @@ class ConversionService(ConversionCore):
                     continue
                 self.files.append({'path':str(p),'type':types[p.suffix.lower()], 'range':'',
                                    'sheets':[], 'status':'pending','size':p.stat().st_size})
+                self.queue_sort = None
                 existing.add(os.path.normcase(str(p)))
         return self.snapshot()
 
@@ -114,13 +119,38 @@ class ConversionService(ConversionCore):
         with self.lock:
             if self.processing:
                 raise ValueError('转换期间不能修改文件队列')
-            if operation == 'clear': self.files = []
+            if operation == 'clear':
+                self.files = []
+                self.queue_sort = None
             elif operation == 'remove': self.files = [f for f in self.files if f['path'] not in paths]
+            elif operation in ('sort_name', 'sort_type'):
+                if len(paths) != 1 or paths[0] not in ('asc', 'desc'):
+                    raise ValueError('排序方向必须为升序或降序')
+                def natural_name(item):
+                    return tuple((0, int(part)) if part.isascii() and part.isdigit() else (1, part)
+                                 for part in re.split(r'([0-9]+)', Path(item['path']).name.casefold()))
+                key = natural_name if operation == 'sort_name' else lambda item: (Path(item['path']).suffix.casefold(), natural_name(item))
+                self.files.sort(key=key, reverse=paths[0] == 'desc')
+                self.queue_sort = {'key': operation[5:], 'direction': paths[0]}
             elif operation in ('up','down') and paths:
                 idx = next((i for i,f in enumerate(self.files) if f['path']==paths[0]),-1)
                 dest = idx + (-1 if operation=='up' else 1)
                 if idx >= 0 and 0 <= dest < len(self.files):
                     self.files[idx],self.files[dest] = self.files[dest],self.files[idx]
+                    self.queue_sort = None
+            elif operation in ('move_before', 'move_after'):
+                if len(paths) != 2:
+                    raise ValueError('请指定拖动文件和目标文件')
+                source, target = paths
+                source_index = next((i for i, f in enumerate(self.files) if f['path'] == source), None)
+                target_index = next((i for i, f in enumerate(self.files) if f['path'] == target), None)
+                if source_index is None or target_index is None:
+                    raise ValueError('队列已变化，请重新拖动文件')
+                if source != target:
+                    item = self.files.pop(source_index)
+                    target_index = next(i for i, f in enumerate(self.files) if f['path'] == target)
+                    self.files.insert(target_index + (operation == 'move_after'), item)
+                    self.queue_sort = None
         return self.snapshot()
 
     def set_range(self, path, value):
@@ -238,6 +268,16 @@ class ConversionService(ConversionCore):
                     reader=PdfReader(target)
                     pages=self.parse_page_spec(item['range'],len(reader.pages)) if item['type']!='Excel' else [0]
                     if not pages: raise ValueError('页码范围为空')
+                    if cfg.blank_page_action == 'remove':
+                        from blank_pages import remove_blank_pages
+                        selected = os.path.join(folder, 'selected.pdf')
+                        selection = PdfWriter()
+                        for index in pages: selection.add_page(reader.pages[index])
+                        with open(selected, 'wb') as stream: selection.write(stream)
+                        filtered, _ = remove_blank_pages(selected, os.path.join(folder, 'nonblank.pdf'), self.cancel_flag, self.queue_log)
+                        if not filtered: raise ValueError('所选页面全部为空白页，无法生成预览')
+                        reader = PdfReader(filtered)
+                        pages = [0]
                     writer=PdfWriter();writer.add_page(reader.pages[pages[0]])
                     first=os.path.join(folder,'first.pdf')
                     with open(first,'wb') as stream: writer.write(stream)

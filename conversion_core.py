@@ -509,6 +509,7 @@ class AppConfig:
     open_folder: bool = False
     clear_after: bool = False
     compress_pdf: bool = False  # 追加
+    blank_page_action: str = 'keep'
 
     wm1_text: str = ""
     wm1_pos: str = "None"
@@ -640,9 +641,28 @@ class ConversionCore:
                             converted = [(target, '')] if ok else []
                         if not converted:
                             raise RuntimeError(self._('log_conv_fail'))
+                        if cfg.blank_page_action == 'remove':
+                            from blank_pages import remove_blank_pages
+                            retained = []
+                            for unit_index, (path, sheet) in enumerate(converted):
+                                filtered = os.path.join(tmp_dir, f'nonblank_{i}_{unit_index}.pdf')
+                                usable, removed = remove_blank_pages(path, filtered, self.cancel_flag, self.queue_log)
+                                if removed:
+                                    pages = ', '.join(map(str, removed[:20])) + ('…' if len(removed) > 20 else '')
+                                    self.queue_log(f"{os.path.basename(f['path'])}{' [' + sheet + ']' if sheet else ''}：移除 {len(removed)} 个空白页（所选页面：{pages}）")
+                                if usable:
+                                    retained.append((usable, sheet))
+                            converted = retained
+                            if not converted:
+                                self.queue_log(f"{os.path.basename(f['path'])}：所选页面全部为空白页，已跳过，不生成空文件")
+                                state(f, 'skipped')
+                                self.queue_progress(progress=i + 1)
+                                continue
                         units.extend({'path': path, 'orig': f, 'sheet': sheet, 'fseq': i + 1}
                                      for path, sheet in converted)
                         state(f, 'finishing')
+                    except InterruptedError:
+                        state(f, 'cancelled')
                     except Exception as exc:
                         state(f, 'failed')
                         self.queue_log(f"{os.path.basename(f['path'])}: {exc}", error=True)

@@ -12,6 +12,7 @@ MatrixFlow PDF (矩流 PDF) is a Windows desktop application with a React/Vite f
 | `desktop.py` | Frameless window, native drag/drop and lifecycle |
 | `app_paths.py` | Storage paths and migration from the previous application name |
 | `desktop_service.py` | Synchronized API, queue, presets, dialogs and window actions |
+| `blank_pages.py` | Conservative visual blank-page detection with PDFium |
 | `conversion_core.py` | Conversion, PDF processing, naming and shared translations |
 | `office_backend.py` | Office/WPS COM adapters and session cleanup |
 | `assets/` | Icon master, Windows ICO, generation prompt and executable version metadata |
@@ -42,7 +43,7 @@ The header is the drag region; double-clicking maximizes/restores the window. Co
 ## Verification
 
 ```powershell
-.\.venv\Scripts\python.exe -B -m unittest test_app_paths test_desktop_service test_office_backend -v
+.\.venv\Scripts\python.exe -B -m unittest test_blank_pages test_app_paths test_desktop_service test_office_backend -v
 npm.cmd --prefix frontend exec -- vitest run --root frontend
 .\.venv\Scripts\python.exe verify_desktop_startup.py
 .\.venv\Scripts\python.exe verify_desktop_engines.py
@@ -77,3 +78,11 @@ Cancellation waits for the current synchronous COM operation to finish before re
 Display name: **MatrixFlow PDF**. Chinese name: **矩流 PDF**. Tagline: **让文档有序流转。**
 
 Executable: `MatrixFlowPDF.exe`; npm package: `matrixflow-pdf`; icon master: `assets/matrixflow-pdf.png`. Windows icon and frontend favicon derive from the same artwork. The original MIT copyright attribution remains in `LICENSE`.
+
+## Queue ordering and blank-page removal
+
+`modify_queue` supports relative `move_before`/`move_after` operations using source/target paths and `sort_name`/`sort_type` with `asc`/`desc`. All operations run under the service lock and reject mutation while converting. `queue_sort` exposes the active column/direction and clears after manual moves or new files. The frontend separates internal row drags from external file drops.
+
+`blank_page_action` is `keep` by default; `remove` filters each converted unit after range selection and before split/merge/watermark/page-number generation. All-blank inputs become skipped. Candidate pages are rendered by [pypdfium2](https://pypdfium2.readthedocs.io/en/stable/python_api.html). Text/annotations are retained first, then every rendered color channel must stay at least 252/255 to classify a page as blank. Rendering uses 108 dpi and an eight-million-pixel limit; oversized or uncertain pages are retained. PDFium calls are serialized with a process lock. Scans with background noise are intentionally retained. Source PDFs are unchanged.
+
+The startup smoke check also drives table sorting and HTML drag events through the real WebView2 bridge. Python tests verify that queue ordering affects merged page order and blank removal preserves sparse content, numbering and previews.

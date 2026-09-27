@@ -1,11 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, copy_metadata
 
 a = Analysis(
     ['desktop.py'],
     pathex=[],
-    binaries=[],
-    datas=[('frontend/build', 'frontend/build'), ('assets/matrixflow-pdf.ico', 'assets')] + collect_data_files('webview'),
+    binaries=collect_dynamic_libs('pypdfium2_raw'),
+    datas=[('frontend/build', 'frontend/build'), ('assets/matrixflow-pdf.ico', 'assets')]
+          + collect_data_files('webview') + collect_data_files('pypdfium2')
+          + collect_data_files('pypdfium2_raw') + copy_metadata('pypdfium2'),
     hiddenimports=['webview.platforms.edgechromium', 'webview.platforms.winforms'],
     hookspath=[],
     hooksconfig={},

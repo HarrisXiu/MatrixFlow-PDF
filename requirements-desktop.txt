@@ -3,4 +3,5 @@ pywin32
 pypdf
 Pillow
 reportlab
+pypdfium2==5.13.0
 pyinstaller==6.22.2
