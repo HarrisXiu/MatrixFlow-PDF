@@ -44,10 +44,13 @@ The header is the drag region; double-clicking maximizes/restores the window. Co
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest test_app_paths test_desktop_service test_office_backend -v
 npm.cmd --prefix frontend exec -- vitest run --root frontend
+.\.venv\Scripts\python.exe verify_desktop_startup.py
 .\.venv\Scripts\python.exe verify_desktop_engines.py
 ```
 
 Python tests cover configuration migration, output preservation, cancellation, queue operations, presets, PDF processing and engine selection. React tests exercise the queue, titlebar actions and preferences. The smoke script requires both Office and WPS and exports the three supplied Office fixtures through the desktop service.
+
+Build the frontend before running `verify_desktop_startup.py`. This check opens a hidden WebView2 window, waits for the real Python bridge and confirms that the compiled interface connects without a startup error, then closes the window.
 
 To regenerate the sample documents, install `python-docx`, `openpyxl` and `python-pptx` in a development environment and run `test_artifacts_setup.py`. These packages are not runtime dependencies.
 

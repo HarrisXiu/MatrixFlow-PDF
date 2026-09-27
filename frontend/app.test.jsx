@@ -1,5 +1,5 @@
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
-import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
+import {render,screen,fireEvent,waitFor,cleanup,act} from '@testing-library/react';
 import {App} from './src/main';
 
 const defaults={engine:'auto',lang:'zh_cn',matrix_motion:false,out_mode:'original',output_dir:'',naming_tpl:'{name}',wm1_text:'',wm1_pos:'None',wm2_text:'',wm2_pos:'None',wm_font:'',wm_size:60,wm_color:'#C0C0C0',wm_alpha:.3,pg_enabled:false,pg_pos:'bc',pg_format:'- {n} / {total} -',merge_all:false,password:''};
@@ -15,6 +15,35 @@ beforeEach(()=>{
 afterEach(()=>{cleanup();delete window.pywebview;vi.restoreAllMocks()});
 
 describe('React desktop workspace',()=>{
+ it('waits for injected methods instead of calling the empty bridge object',async()=>{
+  window.pywebview={api:{}};
+  render(<App/>);
+  expect(screen.getByRole('button',{name:'最小化'}).disabled).toBe(true);
+  expect(screen.queryByText(/snapshot.*not a function/)).toBeNull();
+  state.files=[{path:'C:/ready.pdf',name:'ready.pdf',size:1024,type:'PDF',range:'',status:'pending',output:'ready.pdf'}];
+  await act(async()=>{
+   window.pywebview.api=api;
+   window.dispatchEvent(new Event('pywebviewready'));
+   window.dispatchEvent(new Event('pywebviewready'));
+  });
+  expect(await screen.findByText('ready.pdf',{selector:'strong'})).toBeTruthy();
+  expect(screen.getByRole('button',{name:'最小化'}).disabled).toBe(false);
+  expect(api.snapshot).toHaveBeenCalledTimes(1);
+ });
+ it('recovers when the bridge appears after mounting without a ready event',async()=>{
+  delete window.pywebview;
+  render(<App/>);
+  window.pywebview={api};
+  await waitFor(()=>expect(screen.getByRole('button',{name:'最小化'}).disabled).toBe(false));
+  expect(screen.queryByText(/not a function/)).toBeNull();
+ });
+ it('handles actions during bridge injection without a JavaScript error',async()=>{
+  window.pywebview={api:{}};
+  render(<App/>);
+  fireEvent.click(screen.getByRole('button',{name:'添加文件'}));
+  expect(await screen.findByText('正在连接桌面服务，请稍候')).toBeTruthy();
+  expect(screen.queryByText(/not a function/)).toBeNull();
+ });
  it('connects and shows the empty queue without decorative header controls',async()=>{
   render(<App/>);
   await waitFor(()=>expect(screen.getByRole('button',{name:'最小化'}).disabled).toBe(false));
