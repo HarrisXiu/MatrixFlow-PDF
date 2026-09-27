@@ -296,7 +296,7 @@ class DesktopAPI:
     def pick_files(self):
         import webview
         paths=self._window.create_file_dialog(webview.FileDialog.OPEN,allow_multiple=True,
-            file_types=('Office / PDF / Images (*.doc;*.docx;*.xls;*.xlsx;*.xlsm;*.ppt;*.pptx;*.pdf;*.png;*.jpg;*.jpeg)',))
+            file_types=('Supported files (*.doc;*.docx;*.xls;*.xlsx;*.xlsm;*.ppt;*.pptx;*.pdf;*.png;*.jpg;*.jpeg)',))
         return self._service.add(paths or [])
 
     def pick_folder(self, add=False):

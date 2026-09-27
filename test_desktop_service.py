@@ -115,5 +115,41 @@ class DesktopTests(unittest.TestCase):
         while not api._window.destroy.called and time.monotonic()<deadline: time.sleep(.01)
         api._window.destroy.assert_called_once()
 
+    def test_file_picker_validates_native_filter_and_adds_selection(self):
+        import webview
+        from webview.util import parse_file_type
+
+        document = self.folder / 'selected.docx'
+        document.write_bytes(b'file picker fixture')
+        api = DesktopAPI(self.service)
+        api._window = MagicMock()
+
+        def native_dialog(dialog_type, *, allow_multiple, file_types):
+            self.assertEqual(dialog_type, webview.FileDialog.OPEN)
+            self.assertTrue(allow_multiple)
+            extensions = set()
+            for file_type in file_types:
+                _, patterns = parse_file_type(file_type)
+                extensions.update(patterns.split(';'))
+            self.assertEqual(extensions, {
+                '*.doc', '*.docx', '*.xls', '*.xlsx', '*.xlsm', '*.ppt',
+                '*.pptx', '*.pdf', '*.png', '*.jpg', '*.jpeg',
+            })
+            return (str(self.source), str(document))
+
+        api._window.create_file_dialog.side_effect = native_dialog
+        result = api.pick_files()
+        self.assertEqual([item['path'] for item in result['files']],
+                         [str(self.source), str(document)])
+        self.assertEqual([item['type'] for item in result['files']], ['PDF', 'Word'])
+
+    def test_cancelled_file_picker_preserves_queue(self):
+        self.service.add([str(self.source)])
+        api = DesktopAPI(self.service)
+        api._window = MagicMock()
+        api._window.create_file_dialog.return_value = None
+        result = api.pick_files()
+        self.assertEqual([item['path'] for item in result['files']], [str(self.source)])
+
 
 if __name__=='__main__': unittest.main()
